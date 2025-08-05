@@ -1,27 +1,44 @@
 # main_proyecto.py
+
+# Importar funciones de los módulos separados
 import cv2
 import os
-import matplotlib.pyplot as plt # Para la visualización de comparación
+import matplotlib.pyplot as plt # Se mantiene para los histogramas si se usan
 
-# Importa las funciones de mejora y métricas que has definido
-# Asegúrate de que estos archivos (funciones_mejora.py y funciones_metrica.py)
-# estén en la misma carpeta o en una ruta accesible.
-from funciones_mejora import aplicar_ecualizacion_histograma, aplicar_clahe # Asume que estas funciones existen
+from funciones_mejora import aplicar_ecualizacion_histograma, aplicar_clahe
 from funciones_metrica import calcular_ambe, calcular_psnr, calcular_contraste, calcular_entropia, mostrar_histograma
 
-# --- Configuración de la Base de Datos ---
-# ¡CAMBIA ESTA RUTA A LA UBICACIÓN REAL DE TUS IMÁGENES BSDS!
-# Por ejemplo, si descargaste las imágenes de entrenamiento en 'BSDS300/images/train/'
-RUTA_BASE_DATOS = r'C:\Users\tanya\OneDrive\Escritorio\Procesamiento de imagenes\Trabajo Practico 1\bsds_dataset\BSDS300\images\train'
-
-# Puedes listar algunas imágenes específicas o iterar sobre todas las de una carpeta
-# Para empezar, puedes tomar algunas imágenes de ejemplo de la carpeta 'train' o 'test'
-# IMAGENES_A_PROCESAR = ['imagen_ejemplo_1.jpg', 'imagen_ejemplo_2.jpg']
-# O para procesar todas las imágenes en la carpeta:
-IMAGENES_A_PROCESAR = [f for f in os.listdir(RUTA_BASE_DATOS) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff'))]
-
-
 if __name__ == "__main__":
+    print("--- Ejecutando Ejercicios de Procesamiento de Imágenes ---")
+
+    # --- Configuración de la Base de Datos ---
+    # ¡CAMBIA ESTA RUTA A LA UBICACIÓN REAL DE TUS IMÁGENES BSDS!
+    # Se usa 'r' antes de la cadena para tratar las barras invertidas como caracteres literales.
+    RUTA_BASE_DATOS = r'C:\Users\tanya\OneDrive\Escritorio\Procesamiento de imagenes\Trabajo Practico 1\bsds_dataset\BSDS300\images\train'
+
+    # Obtener la lista completa de imágenes en la base de datos
+    todos_los_archivos = [f for f in os.listdir(RUTA_BASE_DATOS) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff'))]
+    
+    # --- Solicitar al usuario el número de imágenes a analizar ---
+    num_imagenes_a_analizar = None
+    while num_imagenes_a_analizar is None:
+        try:
+            user_input = input(f"\n¿Cuántas imágenes desea analizar? (Máximo {len(todos_los_archivos)}): ")
+            if user_input.lower() == 'todas':
+                num_imagenes_a_analizar = len(todos_los_archivos)
+            else:
+                num_imagenes_a_analizar = int(user_input)
+                if not (0 < num_imagenes_a_analizar <= len(todos_los_archivos)):
+                    print(f"Por favor, ingrese un número entre 1 y {len(todos_los_archivos)} o 'todas'.")
+                    num_imagenes_a_analizar = None
+        except ValueError:
+            print("Entrada inválida. Por favor, ingrese un número entero o 'todas'.")
+            num_imagenes_a_analizar = None
+
+    # Filtrar la lista de imágenes según la entrada del usuario
+    IMAGENES_A_PROCESAR = todos_los_archivos[:num_imagenes_a_analizar]
+    print(f"Se analizarán {len(IMAGENES_A_PROCESAR)} imágenes.")
+
     resultados_globales = {}
 
     for nombre_imagen in IMAGENES_A_PROCESAR:

@@ -96,3 +96,150 @@ if __name__ == "__main__":
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+
+def aplicar_dsihe(imagen_original_bgr):
+    """
+    Aplica el algoritmo de ecualización de histograma de sub-imágenes dualistas
+    de área igual (DSIHE).
+    El método divide la imagen en dos sub-imágenes de igual área (cantidad de píxeles)
+    basado en el valor de la mediana, y luego ecualiza cada sub-imagen
+    independientemente.
+    Retorna la imagen mejorada en escala de grises.
+
+    Args:
+        imagen_original_bgr (numpy.ndarray): Imagen original en formato BGR (o escala de grises).
+
+    Returns:
+        numpy.ndarray: Imagen mejorada con DSIHE en escala de grises.
+    """
+    # Convertir a escala de grises si la imagen es a color
+    if len(imagen_original_bgr.shape) == 3:
+        imagen_gris = cv2.cvtColor(imagen_original_bgr, cv2.COLOR_BGR2GRAY)
+    else:
+        imagen_gris = imagen_original_bgr
+
+    # 1. Obtener la mediana del histograma para dividir la imagen en dos sub-imágenes de igual área
+    hist = cv2.calcHist([imagen_gris], [0], None, [256], [0, 256]).flatten()
+    cdf = hist.cumsum()
+    total_pixeles = imagen_gris.size
+    mediana_pixel_count = total_pixeles // 2
+    
+    # Encontrar el nivel de gris que corresponde a la mediana (donde cdf alcanza la mitad de los píxeles)
+    umbral_mediana = 0
+    for i, count in enumerate(cdf):
+        if count >= mediana_pixel_count:
+            umbral_mediana = i
+            break
+
+    # 2. Segmentar la imagen en dos sub-imágenes: una oscura y otra brillante
+    imagen_oscura = imagen_gris[imagen_gris < umbral_mediana]
+    imagen_brillante = imagen_gris[imagen_gris >= umbral_mediana]
+
+    # Crear una imagen vacía del mismo tamaño para el resultado
+    imagen_dsihe = np.zeros_like(imagen_gris)
+
+    # 3. Aplicar ecualización de histograma a cada sub-imagen por separado
+    if imagen_oscura.size > 0:
+        hist_oscura = cv2.calcHist([imagen_oscura], [0], None, [umbral_mediana], [0, umbral_mediana]).flatten()
+        cdf_oscura = hist_oscura.cumsum()
+        
+        # Función de transformación para la sub-imagen oscura
+        transform_oscura = cdf_oscura / cdf_oscura.max() * (umbral_mediana - 1)
+        transform_oscura = transform_oscura.astype('uint8')
+        
+        # Aplicar la transformación a los píxeles de la imagen oscura
+        p_oscura = imagen_gris < umbral_mediana
+        imagen_dsihe[p_oscura] = transform_oscura[imagen_gris[p_oscura]]
+
+    if imagen_brillante.size > 0:
+        hist_brillante = cv2.calcHist([imagen_brillante], [0], None, [256 - umbral_mediana], [umbral_mediana, 256]).flatten()
+        cdf_brillante = hist_brillante.cumsum()
+        
+        # Función de transformación para la sub-imagen brillante
+        transform_brillante = cdf_brillante / cdf_brillante.max() * (255 - umbral_mediana) + umbral_mediana
+        transform_brillante = transform_brillante.astype('uint8')
+
+        # Aplicar la transformación a los píxeles de la imagen brillante
+        p_brillante = imagen_gris >= umbral_mediana
+        imagen_dsihe[p_brillante] = transform_brillante[imagen_gris[p_brillante] - umbral_mediana]
+
+    print("Algoritmo DSIHE aplicado.")
+    return imagen_dsihe
+
+def aplicar_bbhe(imagen_original_bgr):
+    """
+    Aplica el algoritmo de ecualización de bi-histograma que preserva el brillo (BBHE).
+    El método segmenta el histograma original en dos partes basándose en la media
+    de la imagen, y luego ecualiza cada parte de forma independiente.
+    Retorna la imagen mejorada en escala de grises.
+
+    Args:
+        imagen_original_bgr (numpy.ndarray): Imagen original en formato BGR (o escala de grises).
+
+    Returns:
+        numpy.ndarray: Imagen mejorada con BBHE en escala de grises.
+    """
+    # Convertir a escala de grises si la imagen es a color
+    if len(imagen_original_bgr.shape) == 3:
+        imagen_gris = cv2.cvtColor(imagen_original_bgr, cv2.COLOR_BGR2GRAY)
+    else:
+        imagen_gris = imagen_original_bgr
+   
+    if imagen_gris.size == 0:
+        return imagen_gris
+
+    # Calcular la media (brillo promedio) de la imagen
+    media = np.mean(imagen_gris).astype(np.uint8)
+
+    # Crear una imagen vacía del mismo tamaño para el resultado
+    imagen_bbhe = np.zeros_like(imagen_gris)
+
+    # Manejar el caso de que la imagen sea muy oscura (media = 0)
+    if media == 0:
+        media_ajustada = 1
+    else:
+        media_ajustada = media
+   
+    # Segmentar la imagen en dos sub-imágenes: una oscura y otra brillante
+    imagen_oscura = imagen_gris[imagen_gris < media_ajustada]
+    imagen_brillante = imagen_gris[imagen_gris >= media_ajustada]
+
+    # Aplicar ecualización de histograma a cada sub-imagen por separado
+    if imagen_oscura.size > 0:
+        hist_oscura = cv2.calcHist([imagen_oscura], [0], None, [media_ajustada], [0, media_ajustada]).flatten()
+        cdf_oscura = hist_oscura.cumsum()
+       
+        # Evitar división por cero si el CDF mínimo es igual al máximo
+        if cdf_oscura.max() - cdf_oscura.min() > 0:
+            cdf_oscura_normalizada = (cdf_oscura - cdf_oscura.min()) / (cdf_oscura.max() - cdf_oscura.min())
+            transform_oscura = cdf_oscura_normalizada * (media_ajustada - 1)
+        else:
+            transform_oscura = np.full_like(cdf_oscura, media_ajustada - 1, dtype=float)
+       
+        transform_oscura = np.round(transform_oscura)
+        transform_oscura = np.clip(transform_oscura, 0, media_ajustada - 1).astype('uint8')
+       
+        p_oscura = imagen_gris < media_ajustada
+        imagen_bbhe[p_oscura] = transform_oscura[imagen_gris[p_oscura]]
+
+    if imagen_brillante.size > 0:
+        num_bins_brillante = 255 - media_ajustada
+        hist_brillante = cv2.calcHist([imagen_brillante], [0], None, [num_bins_brillante], [media_ajustada, 256]).flatten()
+        cdf_brillante = hist_brillante.cumsum()
+       
+        if cdf_brillante.max() - cdf_brillante.min() > 0:
+            cdf_brillante_normalizada = (cdf_brillante - cdf_brillante.min()) / (cdf_brillante.max() - cdf_brillante.min())
+            transform_brillante = cdf_brillante_normalizada * (255 - media_ajustada) + media_ajustada
+        else:
+            transform_brillante = np.full_like(cdf_brillante, 255, dtype=float)
+           
+        transform_brillante = np.round(transform_brillante)
+        transform_brillante = np.clip(transform_brillante, media_ajustada, 255).astype('uint8')
+
+        p_brillante = imagen_gris >= media_ajustada
+        mapeo_indices = imagen_gris[p_brillante] - media_ajustada
+        imagen_bbhe[p_brillante] = transform_brillante[mapeo_indices]
+
+    print("Algoritmo BBHE aplicado.")
+    return imagen_bbhe

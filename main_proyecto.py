@@ -1,9 +1,8 @@
-# main_proyecto.py
-
-# Importar funciones de los módulos separados
 import cv2
 import os
 import matplotlib.pyplot as plt
+import pandas as pd 
+import numpy as np 
 
 from funciones_mejora import aplicar_ecualizacion_histograma, aplicar_clahe, aplicar_dsihe, aplicar_bbhe
 from funciones_metrica import calcular_ambe, calcular_psnr, calcular_contraste, calcular_entropia, mostrar_histograma
@@ -11,14 +10,14 @@ from funciones_metrica import calcular_ambe, calcular_psnr, calcular_contraste, 
 if __name__ == "__main__":
     print("--- Ejecutando Ejercicios de Procesamiento de Imágenes ---")
 
-    # --- Configuración de la Base de Datos ---
-    RUTA_BASE_DATOS = r'C:\Users\HP\Desktop\MIAAD\M3_PROCESAMIENTO_DE_IMAGENES\Semana_3\TAREA_SUMATIVA_1\bsds_dataset\BSDS300\images\train'
-   
-    # Obtener la lista completa de imágenes en la base de datos y ordenarlas
+    # --- Configuramos la ruta de la base de datos ---
+    RUTA_BASE_DATOS = r'C:\Users\tanya\OneDrive\Escritorio\Procesamiento de imagenes\Trabajo Practico 1\bsds_dataset\BSDS300\images\train'
+    
+    # Obtenemos la lista completa de imágenes en la base de datos y la ordenamos
     todos_los_archivos = [f for f in os.listdir(RUTA_BASE_DATOS) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff'))]
     todos_los_archivos = sorted(todos_los_archivos, key=lambda x: int(os.path.splitext(x)[0]))
-   
-    # --- Solicitar al usuario el número de imágenes a analizar ---
+    
+    # --- Solicitamos al usuario el número de imágenes a analizar ---
     num_imagenes_a_analizar = None
     while num_imagenes_a_analizar is None:
         try:
@@ -34,11 +33,12 @@ if __name__ == "__main__":
             print("Entrada inválida. Por favor, ingrese un número entero o 'todas'.")
             num_imagenes_a_analizar = None
 
-    # Filtrar la lista de imágenes según la entrada del usuario
+    # Filtramos la lista de imágenes según la entrada del usuario
     IMAGENES_A_PROCESAR = todos_los_archivos[:num_imagenes_a_analizar]
     print(f"Se analizarán {len(IMAGENES_A_PROCESAR)} imágenes.")
 
-    resultados_globales = {}
+    # Listamos para almacenar los resultados de todas las imágenes
+    resultados_globales = []
 
     for nombre_imagen in IMAGENES_A_PROCESAR:
         ruta_completa = os.path.join(RUTA_BASE_DATOS, nombre_imagen)
@@ -57,10 +57,11 @@ if __name__ == "__main__":
         imagen_dsihe = aplicar_dsihe(imagen_original_bgr)
         imagen_bbhe = aplicar_bbhe(imagen_original_bgr)
 
-        # --- Calcular Métricas para cada técnica ---
+        # --- Calculamos las Métricas para cada técnica ---
+
         metricas_original = {
-            "AMBE": "-",
-            "PSNR": "-",
+            "AMBE": np.nan,
+            "PSNR": np.nan,
             "Contraste": calcular_contraste(imagen_original_gris),
             "Entropia": calcular_entropia(imagen_original_gris)
         }
@@ -85,7 +86,7 @@ if __name__ == "__main__":
             "Contraste": calcular_contraste(imagen_dsihe),
             "Entropia": calcular_entropia(imagen_dsihe)
         }
-       
+        
         metricas_bbhe = {
             "AMBE": calcular_ambe(imagen_original_gris, imagen_bbhe),
             "PSNR": calcular_psnr(imagen_original_gris, imagen_bbhe),
@@ -100,8 +101,7 @@ if __name__ == "__main__":
         print(f"DSIHE: {metricas_dsihe}")
         print(f"BBHE: {metricas_bbhe}")
 
-        # --- Mostrar Comparación Visual de Imágenes y sus Histogramas ---
-        # He ajustado las funciones para que comparen 5 imágenes en lugar de 4
+        # --- Mostramos una comparación visual de imágenes y sus histogramas ---
         def mostrar_comparacion(original, he, clahe, dsihe, bbhe):
             plt.figure(figsize=(24, 6))
 
@@ -119,12 +119,12 @@ if __name__ == "__main__":
             plt.imshow(clahe, cmap='gray')
             plt.title('CLAHE')
             plt.axis('off')
-           
+            
             plt.subplot(1, 5, 4)
             plt.imshow(dsihe, cmap='gray')
             plt.title('DSIHE')
             plt.axis('off')
-           
+            
             plt.subplot(1, 5, 5)
             plt.imshow(bbhe, cmap='gray')
             plt.title('BBHE')
@@ -160,7 +160,7 @@ if __name__ == "__main__":
             plt.title(f'Hist. DSIHE ({nombre_img})')
             plt.xlabel("Nivel de Píxel")
             plt.grid(True, linestyle='--', alpha=0.6)
-           
+            
             plt.subplot(1, 5, 5)
             plt.hist(bbhe_gris.flatten(), bins=256, range=[0, 256], color='orange', alpha=0.7)
             plt.title(f'Hist. BBHE ({nombre_img})')
@@ -173,13 +173,56 @@ if __name__ == "__main__":
         mostrar_comparacion(imagen_original_bgr, imagen_he, imagen_clahe, imagen_dsihe, imagen_bbhe)
         mostrar_histogramas_comparativos(imagen_original_gris, imagen_he, imagen_clahe, imagen_dsihe, imagen_bbhe, nombre_imagen)
 
-        # Guardar resultados (opcional)
-        resultados_globales[nombre_imagen] = {
-            "original": metricas_original,
-            "HE": metricas_he,
-            "CLAHE": metricas_clahe,
-            "DSIHE": metricas_dsihe,
-            "BBHE": metricas_bbhe
-        }
+        # Guardamos los resultados en la lista para generar un cuadro comparativo
+        resultados_globales.append({
+            "Imagen": nombre_imagen,
+            "Técnica": "Original",
+            "AMBE": metricas_original["AMBE"],
+            "PSNR": metricas_original["PSNR"],
+            "Contraste": metricas_original["Contraste"],
+            "Entropia": metricas_original["Entropia"]
+        })
+        resultados_globales.append({
+            "Imagen": nombre_imagen,
+            "Técnica": "HE",
+            "AMBE": metricas_he["AMBE"],
+            "PSNR": metricas_he["PSNR"],
+            "Contraste": metricas_he["Contraste"],
+            "Entropia": metricas_he["Entropia"]
+        })
+        resultados_globales.append({
+            "Imagen": nombre_imagen,
+            "Técnica": "CLAHE",
+            "AMBE": metricas_clahe["AMBE"],
+            "PSNR": metricas_clahe["PSNR"],
+            "Contraste": metricas_clahe["Contraste"],
+            "Entropia": metricas_clahe["Entropia"]
+        })
+        resultados_globales.append({
+            "Imagen": nombre_imagen,
+            "Técnica": "DSIHE",
+            "AMBE": metricas_dsihe["AMBE"],
+            "PSNR": metricas_dsihe["PSNR"],
+            "Contraste": metricas_dsihe["Contraste"],
+            "Entropia": metricas_dsihe["Entropia"]
+        })
+        resultados_globales.append({
+            "Imagen": nombre_imagen,
+            "Técnica": "BBHE",
+            "AMBE": metricas_bbhe["AMBE"],
+            "PSNR": metricas_bbhe["PSNR"],
+            "Contraste": metricas_bbhe["Contraste"],
+            "Entropia": metricas_bbhe["Entropia"]
+        })
 
     print("\n--- Análisis Completado ---")
+
+    # --- Mostramos la tabla comparativa ---
+    if len(IMAGENES_A_PROCESAR) > 0:
+        print("\n--- Cuadro Comparativo de Métricas (Detallado por Imagen) ---")
+        df = pd.DataFrame(resultados_globales)
+        df_pivot = df.pivot_table(index=['Imagen', 'Técnica'], values=['AMBE', 'PSNR', 'Contraste', 'Entropia'])
+        print(df_pivot)
+        print("\n")
+    else:
+        print("\nNo se analizó ninguna imagen.")
